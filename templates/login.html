@@ -1,0 +1,49 @@
+<html>
+    <head>
+        <meta charset="utf-8" name="viewport" content="width=device-width, height=device-height, minimum-scale=1.0, maximum-scale=1.0, initial-scale=1.0">
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+        <link rel="stylesheet" href= "{{ url_for('static',filename='login.css') }}">
+    </head>
+    <body>
+        <header>
+            <center><h2 style="font-size: 30px; color: whitesmoke; margin-top: 30px;">Lee Real Estate</h2></center>
+            <h3 style="color: rgba(245, 245, 245, 0.821); "> Welcome to Lee Real Estate, the best Real Estate Service</h3>
+        </header>
+
+            <div class="input-box">
+                <input id="username" type="text" name="username" placeholder="ID">
+                <label for="username">ID</label>
+            </div>
+
+            <div class="input-box">
+                <input id="password" type="password" name="password" placeholder="PASSWORD">
+                <label for="password">PASSWORD</label>
+            </div>
+
+            <input type="button" value="Login" id="execute">
+            
+
+        <script>
+            $('#execute').click(function(){
+                var user = document.getElementById("username").value
+                var pass = document.getElementById("password").value
+                var json = { id: user, password: pass };
+                $.ajax({
+                    type: "POST",
+                    url: '{{url_for("login")}}',
+                    data: JSON.stringify(json),
+                    contentType: "application/json",
+                    success: function(response){ 
+                        window.location.replace('{{url_for("getapartment")}}?token='+response['token'])
+                    },
+                    error: function(request,status,error){
+                        alert("code="+request.status+"message="+request.responseText+"error="+error);
+                    }
+                });
+               
+            })
+
+        </script>
+
+</body>
+</html>

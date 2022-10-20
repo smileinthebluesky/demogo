@@ -1,0 +1,95 @@
+<html>
+                <head>
+                    <meta charset="utf-8" name="viewport" content="width=device-width, height=device-height, minimum-scale=1.0, maximum-scale=1.0, initial-scale=1.0">
+                    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+                    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.5.0/Chart.min.js"></script>
+                    <link rel="stylesheet" href= "{{ url_for('static',filename='main.css') }}">
+                </head>
+                <body>
+
+                    <div id="main_title">
+                        <h2>Lee Real Estate</h2> 
+                        <hr>
+                    </div>    
+                    <!-- For All users -->
+                    <div id = "apartment-info">
+                        <h3>{{data["apart_id"]}}</h3>
+                        <hr>
+                        <h5> Apartment, 3+ beds , 512 m2 </h5>
+                        <h5> $ {{data["Sep"]}},000 </h5>
+                        <div id='chart'></div>
+                    </div>
+
+                    <!-- javascript -->
+                    <script>
+
+                    $(document).ready(function(){
+                        document.getElementById('chart').innerHTML = '<canvas id="line-chart" width="300" height="250"></canvas>'
+
+                        var colour = ["#3e95cd","#8e5ea2","#3cba9f","#e8c3b9"]
+
+                        var myChart = new Chart(document.getElementById("line-chart"), {
+                                type: 'line',
+                                data: {
+                                labels: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep'],
+                                datasets: []
+                                },
+                                options: {
+                                title: {
+                                    display: true,
+                                    fontColor: 'rgb(138,161,161)',
+                                    fontSize: 14,
+                                    text: 'Real Estate price (In Thousands $)',
+                                    position: 'bottom'
+                                },
+                                legend: {
+                                    labels: {
+                                        fontColor: 'rgb(138,161,161)',
+                                        fontSize: 12,
+                                        position: 'bottom'
+                                    }
+                                },
+                                scales: {
+                                    xAxes: [{
+                                            ticks:{
+                                                fontColor : 'rgb(204,204,204)',
+                                                fontSize : 12
+                                            }
+
+                                        }],
+                                        yAxes: [{
+                                            ticks: {
+                                                fontColor : 'rgb(204,204,204)',
+                                                fontSize : 12
+                                            }
+                                        }]
+                                    }
+
+                                
+                                }
+                            });
+
+                        var datalist = JSON.parse('{{ list | tojson }}');;
+                        console.log(datalist)
+                        console.log(datalist.length)
+
+                            for (let i = 0; i < datalist.length; i++){
+                                var newdata = {
+                                    label:"",
+                                    data:[],
+                                    borderColor:"",
+                                    fill:false};
+                                newdata.label = datalist[i]['apart_id']
+                                newdata.data = [datalist[i]['jan'],datalist[i]['Feb'],datalist[i]['Mar'],datalist[i]['Apr'],datalist[i]['May'],datalist[i]['Jun'],datalist[i]['Jul'],datalist[i]['Aug'],datalist[i]['Sep']]
+                                newdata.borderColor = colour[i]
+                                myChart.config.data.datasets.push(newdata);
+
+                            }
+
+                            myChart.update();
+
+                    })
+
+                    </script>
+                </body>
+            </html>

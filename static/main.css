@@ -1,0 +1,34 @@
+@import url(//fonts.googleapis.com/earlyaccess/hanna.css);
+
+body{
+    width: 600px;
+    margin: 0 auto;
+    font-family: 'Hanna', sans-serif;
+    margin-top: 60px;
+    text-align:center;
+    background-color: #253A6C;
+    font-weight: bold;
+}
+h2 {
+    color:#8aa1a1;
+}
+h3 {
+    color:#aaa;
+    margin: 0px;
+}
+h5{
+    color:#aaa;
+    margin: 1px;  
+}
+
+
+#apartment-info{
+    margin-top: 3px;
+    padding: 0px;
+}
+
+#line-chart{
+    margin-top: 10px;
+    color:white;
+}
+                            
