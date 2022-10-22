@@ -3,19 +3,20 @@ from flask_restx import Api,Resource
 import requests
 import boto3
 import json
-import os
 from boto3.dynamodb.conditions import Key
 
 app = Flask(__name__)
 api = Api(app)
 
-ClientId = os.environ.get("clientId")
-url = os.environ.get("requests")
-tablename = os.environ.get("table")
-
 boto3.setup_default_session(region_name='ap-northeast-2')
+ssm = boto3.client('ssm')
 client = boto3.client('cognito-idp', region_name='ap-northeast-2')
 dynamodb = boto3.resource('dynamodb',endpoint_url='http://dynamodb.ap-northeast-2.amazonaws.com')
+
+ClientId = ssm.get_parameter(Name='/demogo-multitenancy/auth/user-pool-client-id', WithDecryption=False)['Parameter']['Value']
+url = ssm.get_parameter(Name='/demogo-multitenancy/opa-url', WithDecryption=False)['Parameter']['Value']
+tablename = ssm.get_parameter(Name='/demogo-multitenancy/table', WithDecryption=False)['Parameter']['Value']
+
 table = dynamodb.Table(tablename)
 
 @api.route('/index')
@@ -83,5 +84,5 @@ class Getapartment(Resource):
 
 
 if __name__ == '__main__':
-    app.run(debug=False, port=5000)
+    app.run(debug=True, port=80, host='0.0.0.0')
 
