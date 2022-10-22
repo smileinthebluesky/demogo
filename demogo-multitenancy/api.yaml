@@ -13,7 +13,7 @@ Resources:
       ContainerDefinitions:
         - Name: web
           Essential: true
-          Image: 126554542098.dkr.ecr.ap-northeast-2.amazonaws.com/flask:test
+          Image: here
           PortMappings:
             - ContainerPort: 80
               HostPort: 80
