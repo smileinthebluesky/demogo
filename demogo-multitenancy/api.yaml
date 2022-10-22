@@ -1,0 +1,230 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: cloudformation for multi-tenancy api
+
+Resources:
+  ECSCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: CFNCluster
+  taskdefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      ContainerDefinitions:
+        - Name: web
+          Essential: true
+          Image: 126554542098.dkr.ecr.ap-northeast-2.amazonaws.com/flask:test
+          PortMappings:
+            - ContainerPort: 80
+              HostPort: 80
+              Protocol: tcp
+          LogConfiguration:
+            logDriver: awslogs
+            Options:
+              awslogs-group: /ecs/opa-service
+              awslogs-region: ap-northeast-2
+              awslogs-stream-prefix: ecs
+      Cpu: '512'
+      ExecutionRoleArn: !GetAtt EcsExecutionRole.Arn
+      TaskRoleArn: !GetAtt EcsRole.Arn
+      Memory: '1024'
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE 
+  ECSService:
+      Type: AWS::ECS::Service
+      Properties:
+        ServiceName: cfn-service
+        Cluster: !Ref ECSCluster
+        DesiredCount: 1 
+        LaunchType: FARGATE
+        NetworkConfiguration:
+          AwsvpcConfiguration:
+            AssignPublicIp: ENABLED
+            SecurityGroups: 
+              - !Ref InstanceSecurityGroup
+            Subnets:
+              - !Ref mySubnet
+        TaskDefinition: !Ref taskdefinition
+  InstanceSecurityGroup:
+      Type: AWS::EC2::SecurityGroup
+      Properties:
+        GroupDescription: Allow http to client host
+        VpcId: !Ref myVPC
+        SecurityGroupIngress:
+          - IpProtocol: tcp
+            FromPort: 80
+            ToPort: 80
+            CidrIp: 0.0.0.0/0
+  myVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsSupport: 'true'
+      EnableDnsHostnames: 'true'
+      Tags:
+        - Key: Name
+          Value: "opa-vpc"
+  myInternetGateway:
+    Type: AWS::EC2::InternetGateway
+  InternetGatewayAttachment: 
+    Type: "AWS::EC2::VPCGatewayAttachment"
+    Properties: 
+      InternetGatewayId: !Ref myInternetGateway
+      VpcId: !Ref myVPC
+  
+  oparoutetable: 
+    Type: "AWS::EC2::RouteTable"
+    Properties: 
+      VpcId: !Ref myVPC 
+
+  oparoute: 
+    Type: "AWS::EC2::Route"
+    Properties: 
+      RouteTableId: !Ref oparoutetable
+      DestinationCidrBlock: "0.0.0.0/0"
+      GatewayId: !Ref myInternetGateway
+
+  oparouteassociation: 
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties: 
+      SubnetId: !Ref mySubnet
+      RouteTableId: !Ref oparoutetable
+
+  mySubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      MapPublicIpOnLaunch: true
+      VpcId:
+        !Ref myVPC
+      CidrBlock: 10.0.0.0/24
+      AvailabilityZone: "ap-northeast-2a"
+
+  EcsExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Action:
+              - "sts:AssumeRole"
+              Effect: "Allow"
+              Principal:
+                Service:
+                  - "ecs-tasks.amazonaws.com"
+
+  EcsRole:
+      Type: AWS::IAM::Role
+      Properties:
+        AssumeRolePolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                - "sts:AssumeRole"
+                Effect: "Allow"
+                Principal:
+                  Service:
+                    - "ecs-tasks.amazonaws.com"
+
+  DynamoDBReadPolicy:
+    Type: "AWS::IAM::Policy"
+    Properties:
+      PolicyName: DynamoDBReadPolicy
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+            Effect: "Allow"
+            Action: [
+              "dynamodb:GetItem",
+              "dynamodb:Scan",
+              "dynamodb:Query",
+              "dynamodb:BatchGetItem",
+              "dynamodb:DescribeTable"
+            ]
+            Resource:
+              - "*"
+      Roles:
+        - !Ref EcsRole
+
+  CognitoPolicy:
+    Type: "AWS::IAM::Policy"
+    Properties:
+      PolicyName: CognitoPolicy
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+            Effect: "Allow"
+            Action: [
+              "cognito-idp:*",
+            ]
+            Resource:
+              - "*"
+      Roles:
+        - !Ref EcsRole
+
+  SSMReadPolicy:
+    Type: "AWS::IAM::Policy"
+    Properties:
+      PolicyName: SSMReadPolicy
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+            Effect: "Allow"
+            Action: [
+                "ssm:Describe*",
+                "ssm:Get*",
+                "ssm:List*"
+            ]
+            Resource:
+              - "*"
+      Roles:
+        - !Ref EcsRole
+  
+  ECRPolicy:
+    Type: "AWS::IAM::Policy"
+    Properties:
+      PolicyName: ECRPolicy
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+            Effect: "Allow"
+            Action: [
+                "ecr:GetAuthorizationToken",
+                "ecr:BatchCheckLayerAvailability",
+                "ecr:GetDownloadUrlForLayer",
+                "ecr:GetRepositoryPolicy",
+                "ecr:DescribeRepositories",
+                "ecr:ListImages",
+                "ecr:DescribeImages",
+                "ecr:BatchGetImage",
+                "ecr:GetLifecyclePolicy",
+                "ecr:GetLifecyclePolicyPreview",
+                "ecr:ListTagsForResource",
+                "ecr:DescribeImageScanFindings"
+            ]
+            Resource:
+              - "*"
+      Roles:
+        - !Ref EcsRole
+        - !Ref EcsExecutionRole
+
+  BasicPolicy:
+    Type: "AWS::IAM::Policy"
+    Properties:
+      PolicyName: BasicPolicy
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+            Effect: "Allow"
+            Action: [
+                "ecr:GetAuthorizationToken",
+                "ecr:BatchCheckLayerAvailability",
+                "ecr:GetDownloadUrlForLayer",
+                "ecr:BatchGetImage",
+                "logs:CreateLogStream",
+                "logs:PutLogEvents"
+            ]
+            Resource:
+              - "*"
+      Roles:
+        - !Ref EcsExecutionRole

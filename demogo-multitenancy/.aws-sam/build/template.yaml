@@ -1,0 +1,16 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Demogo-multitenancy
+Resources:
+  Authtemplate:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: Authtemplate/template.yaml
+    Metadata:
+      SamResourceId: Authtemplate
+  Apitemplate:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: Apitemplate/template.yaml
+    Metadata:
+      SamResourceId: Apitemplate

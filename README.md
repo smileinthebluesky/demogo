@@ -1,4 +1,4 @@
-# demogo - OPA와 SAM/CF를 이용한 Multi-Tenancy 서비스 구축
+# OPA와 SAM/CF를 이용한 Multi-Tenancy 서비스 구축
 
 ###  [OPA](https://www.openpolicyagent.org/) 는 Open Policy Agent의 약자로 서비스를 할 때에 필수적인 policy를 code화 해서 따로 서버를 운영하며, 이를 통해 서비스와 policy를 분리할 수 있게 해주는 Agent입니다. 다양한 분야에서 이용할 수 있지만, 여기에서는 OPA를 통해서 Multi-Tenancy를 구축하는 것에 대해서 다루어 보려고 합니다. 
 

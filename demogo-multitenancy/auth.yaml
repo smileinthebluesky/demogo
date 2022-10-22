@@ -1,0 +1,284 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: cloudformation for multi-tenancy auth
+
+Globals:
+  Api:
+    EndpointConfiguration: REGIONAL
+    TracingEnabled: true
+    OpenApiVersion: '2.0'
+    Cors:
+      AllowMethods: "'OPTIONS,POST,GET'"
+      AllowHeaders: "'Content-Type,Authorization'"
+      AllowCredentials: true
+      AllowOrigin: !Sub "'*'"
+
+Resources:
+  CognitoUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub ${AWS::StackName}-UserPool
+      Policies:
+        PasswordPolicy:
+          MinimumLength : 8 
+      UsernameAttributes:
+        - email
+      Schema:
+          - AttributeDataType: String
+            Name: email
+            Required: true
+            Mutable: false
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: my-app
+      GenerateSecret: false
+      UserPoolId: !Ref CognitoUserPool
+      ExplicitAuthFlows: 
+       - ALLOW_USER_PASSWORD_AUTH
+       - ALLOW_REFRESH_TOKEN_AUTH
+       - ALLOW_ADMIN_USER_PASSWORD_AUTH
+       - ALLOW_USER_SRP_AUTH
+       - ALLOW_CUSTOM_AUTH
+  UserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties: 
+      Domain: "multi-tenancy-demogo"
+      UserPoolId: !Ref CognitoUserPool
+           
+  OpaApi:
+      Type: AWS::Serverless::Api
+      Properties:
+        StageName: Prod
+        MethodSettings:
+          - DataTraceEnabled: True
+            MetricsEnabled: True
+            ResourcePath: "/*"
+            HttpMethod: "*"
+            LoggingLevel: INFO
+        DefinitionBody:
+          swagger: 2.0
+          info:
+            title: ApiGateway
+          paths:
+            /getAuth:
+              post:
+                consumes:
+                  - "application/json"
+                produces:
+                  - "application/json"
+                responses:
+                  '200':
+                    description: "200 response"
+                    headers:
+                      Access-Control-Allow-Origin:
+                        type: "string"
+                x-amazon-apigateway-integration:
+                  uri:
+                    Fn::Sub: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OpaFunction.Arn}/invocations"
+                  responses:
+                    default:
+                      statusCode: "200"
+                      responseParameters:
+                        method.response.header.Access-Control-Allow-Origin: "'*'"
+                  passthroughBehavior: "when_no_templates"
+                  httpMethod: "POST"
+                  type: "aws"
+                
+  OpaFunction:
+      Type: AWS::Serverless::Function
+      Properties:
+        PackageType: Image
+        Events:
+          AuthApi:
+            Type: Api
+            Properties:
+              RestApiId: !Ref OpaApi
+              Path: /getAuth
+              Method: post
+      Metadata:
+        DockerTag: latest
+        DockerContext: demogo/opa
+        Dockerfile: Dockerfile
+  
+  DynamoDBApartmentTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: apartment_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: apartment_id
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+
+  InitializeCognito:
+      Type: AWS::CloudFormation::CustomResource
+      DependsOn: CognitoUserPool
+      Properties:
+        ServiceToken: !GetAtt InitCognitoFunction.Arn
+  
+  InitCognitoFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Runtime: python3.9
+      CodeUri: demogo/
+      Handler: init_cognito.lambda_handler
+      Role: !GetAtt InitCognitoRole.Arn
+      Layers:
+        - !Ref UtilsLayer
+
+  InitializeDynamoDB:
+    Type: AWS::CloudFormation::CustomResource
+    DependsOn: DynamoDBApartmentTable
+    Properties:
+      ServiceToken: !GetAtt InitDynamoFunction.Arn
+  
+  InitDynamoFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Runtime: python3.9
+      CodeUri: demogo/
+      Handler: init_dynamo.lambda_handler
+      Role: !GetAtt InitDynamoRole.Arn
+      Layers:
+        - !Ref UtilsLayer
+
+  UtilsLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      ContentUri: demogo/layer/cfn.zip
+      CompatibleRuntimes:
+        - python3.9
+
+  InitCognitoRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Action:
+              - "sts:AssumeRole"
+              Effect: "Allow"
+              Principal:
+                Service:
+                  - "lambda.amazonaws.com"
+      ManagedPolicyArns:
+          - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"  
+
+  InitDynamoRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Action:
+              - "sts:AssumeRole"
+              Effect: "Allow"
+              Principal:
+                Service:
+                  - "lambda.amazonaws.com"
+      ManagedPolicyArns:
+          - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole" 
+
+  CognitoPolicy:
+    Type: "AWS::IAM::Policy"
+    Properties:
+      PolicyName: CognitoPolicy
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+            Effect: "Allow"
+            Action: [
+              "cognito-idp:*",
+            ]
+            Resource:
+              - "*"
+      Roles:
+        - !Ref InitCognitoRole
+
+  SSMReadPolicy:
+    Type: "AWS::IAM::Policy"
+    Properties:
+      PolicyName: SSMReadPolicy
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+            Effect: "Allow"
+            Action: [
+                "ssm:Describe*",
+                "ssm:Get*",
+                "ssm:List*"
+            ]
+            Resource:
+              - "*"
+      Roles:
+        - !Ref InitCognitoRole
+        - !Ref InitDynamoRole
+
+  DynamoDBWritePolicy:
+    Type: "AWS::IAM::Policy"
+    Properties:
+      PolicyName: DynamoDBWritePolicy
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+            Effect: "Allow"
+            Action: [
+                "dynamodb:BatchWriteItem",
+                "dynamodb:PutItem",
+            ]
+            Resource:
+              - "*"
+      Roles:
+        - !Ref InitDynamoRole
+
+  UserPoolSSM:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Type: String
+      Name: /demogo-multitenancy/auth/user-pool-id
+      Value: !Ref CognitoUserPool
+
+  UserPoolARNSSM:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Type: String
+      Name: /demogo-multitenancy/auth/user-pool-arn
+      Value: !GetAtt CognitoUserPool.Arn
+
+  UserPoolClientSSM:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Type: String
+      Name: /demogo-multitenancy/auth/user-pool-client-id
+      Value: !Ref UserPoolClient
+  
+  DynamoDBSSM:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Type: String
+      Name: /demogo-multitenancy/table
+      Value: !Ref DynamoDBApartmentTable
+
+  AuthApiUrl: 
+      Type: AWS::SSM::Parameter
+      Properties:
+        Type: String
+        Name: /demogo-multitenancy/opa-url
+        Value: !Sub "https://${OpaApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/getAuth"
+
+
+Outputs:
+
+  CognitoCognitoUserPool:
+    Description: "Cognito User Pool ID"
+    Value: !Ref CognitoUserPool
+
+  CognitoAppClientId:
+    Description: "Cognito App Client ID"
+    Value: !Ref UserPoolClient
+
+  UserPoolARN:
+    Description: "UserPool Arn"
+    Value: !Ref UserPoolARNSSM
