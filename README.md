@@ -13,7 +13,8 @@
 <img src="image/arch.jpg">
 
 #### 아키텍쳐를 보면, 
-#### 1. ECS 위에서 Flask 서버를 통해 운영되고 있는 웹 서비스와 2. API gateway 와 Lambda를 통해 웹 서비스와는 별개로 제공되는 OPA Package가 있습니다.
+#### 1. ECS 위에서 Flask 서버를 통해 운영되고 있는 웹 서비스와 
+#### 2. API gateway 와 Lambda를 통해 웹 서비스와는 별개로 제공되는 OPA Package가 있습니다.
 #### 3. Cognito의 경우 로그인 기능과 유저의 tier 및 정보를 저장하는 User DB 역할을, DynamoDB의 경우 아파트의 정보를 저장하는 역할을 합니다. 
 #### ECS는 VPC 내부에 있는 Subnet 안에 존재하고 있어, 기업의 리소스를 나타내며, OPA Package 는 이와는 분리되어 따로 동작하는 형태로, 서비스를 제공할 때에 Policy를 분리해서 따로 관리할 수 있습니다.
 
@@ -108,5 +109,29 @@ http://publicIp/index
 #### 여기에서 template.yaml 파일은 SAM 에서 사용하는 기본 Cloudformation 설정 파일로, 이 설정 파일을 통해 AWS Resource들을 쉽게 올릴 수 있습니다. 이 안에 auth.yaml과 api.yaml을 포함시켜 놓았습니다.
 <img src="image/template.jpg">
 
-#### auth.yaml에서는 Cognito와 Opa package, DynamoDB를 생성하게 되며, api.yaml에서는 ECS와 관련된 자원을 만듭니다. 이렇게 두개의 tempalte이 다른 역할을 하면서 분리되어 있기 때문에, 나중에 따로 쓰기도 용이하고, 실패시 해당 stack 만을 따로 관리할 수 있어 좋습니다. 이제 demogo/demogo-multitenancy/demogo 폴더로 들어가 보겠습니다. init_cognito.py 와 init_dynamo.py 파일이 먼저 보일겁니다. 이는 서비스가 잘 작동할 수 있도록, 미리 유저를 생성하고 아파트 정보를 넣어주는 용도입니다. auth.yaml 로 만들어지는 리소스에서 이를 이용하고 있습니다. 
+#### auth.yaml에서는 Cognito와 Opa package, DynamoDB를 생성하게 되며, api.yaml에서는 ECS와 관련된 자원을 만듭니다. 
+#### 이렇게 두개의 tempalte이 다른 역할을 하면서 분리되어 있기 때문에, 나중에 따로 쓰기도 용이하고, 실패시 해당 stack 만을 따로 관리할 수 있어 좋습니다. 
+#### 이제 demogo/demogo-multitenancy/demogo 폴더로 들어가 보겠습니다. init_cognito.py 와 init_dynamo.py 파일이 먼저 보일겁니다. 이는 서비스가 잘 작동할 수 있도록, 미리 유저를 생성하고 아파트 정보를 넣어주는 용도입니다. auth.yaml 로 만들어지는 리소스에서 이를 이용하고 있습니다. 
 
+#### 이제 OPA 폴더로 들어가게 되면, 아래와 같은 파일들이 존재합니다.
+<img src="image/opa.jpg">
+
+#### [OPA](https://www.openpolicyagent.org/docs/latest/management-bundles/)는 Server를 Running할 때에 Policy 파일로 이루어진 bundle과 함께 운용됩니다. Policy 파일은 [Rego](https://www.openpolicyagent.org/docs/latest/policy-language/) 문법을 사용하고 있는데, 처음에는 생소할 수 있지만 익힌다면 어떤 정책이든 자유롭게 코드로 표현할 수 있습니다. 아래는 이 서비스에서 이용하는 Rego 파일입니다.
+
+```
+package demogo
+
+default service = false
+
+service = true {
+    rego_role := data.roles[input.tier][_]
+    contains(rego_role, input.role)
+}
+
+```
+
+#### Dockerfile은 docker image를 만드는 용도의 파일로, OPA Package 안에 있는 Lambda 를 만들때에 사용됩니다. Lambda는 컨테이너 이미지로도 빌드할 수 있어서 이렇게 사용하실 수 있습니다.
+
+#### 이렇게 서비스 내부까지 살펴보았습니다. 서비스 삭제는 아까 만들었던 opaservice ECR Repository를 삭제하는 것과, [Cloudformation](https://ap-northeast-2.console.aws.amazon.com/cloudformation/home?region=ap-northeast-2#/stacks?filteringStatus=active&filteringText=&viewNested=true&hideStacks=false) 에서 opa-service stack을 Delete 하면 끝납니다. 상당히 간단하죠?
+
+#### Delete_Failed 상태가 뜰 수도 있는데, 이는 Cloudformation 내에 생성한 custom resource 때문으로, 다시 삭제 해 주시면 정상적으로 삭제됩니다. 
