@@ -5,7 +5,7 @@
 #### Lee Real Estate 서비스는 부동산 서비스로, 유주택자에게 어떤 아파트로 갈아타는 것이 좋을지에 대한 가이드를 제시합니다. 단, 프리미엄 고객에게만요. Multi-Tenancy로 분리되어 있는 일반 고객과 프리미엄 고객에게는 tier에 따라 다른 서비스를 제공하게 되는데요, OPA를 통해서 이를 간단하게 만들 수 있습니다. 이제 이를 조금의 시간을 들여서 만들어 볼 것입니다.
 
 ####  구성하게 되면 다음과 같은 아키텍쳐가 생성됩니다. 도커 이미지를 ECR에 올리는 것 외에는 모든 것이 SAM과 CF를 통해 자동화되어 있습니다! 
-<img src="arch.jpeg">
+<img src="image/arch.jpeg">
 
 ####  계속 진행하기 위해서는 다음의 임무를 완수해야 합니다. 임무들을 완성하면 나중에도 도움이 될 겁니다. 
 
@@ -45,7 +45,7 @@ docker push 계정번호.dkr.ecr.ap-northeast-2.amazonaws.com/opaservice:latest
 ```
 
 #### [ECR](https://ap-northeast-2.console.aws.amazon.com/ecr/repositories?region=ap-northeast-2)에 접속해서 방금 만든 opaservice repository에 들어갑니다. Image URI 항목 아래의 Copy URI 를 눌러 URI를 카피해서 메모장에 저장합니다.
-<img src="ecr.jpg">
+<img src="image/ecr.jpg">
 
 #### 이제 본격적으로 서비스 빌드를 해보겠습니다. /demogo/demogo-multitenancy 경로에 있는 api.yaml 파일을 IDE로 오픈하고, 아래의 'here' 부분 (16번째 줄) 을 아까 저장했던 URI 로 치환합니다.
 ```
@@ -67,17 +67,17 @@ sam deploy --guided --stack-name opa-service --capabilities CAPABILITY_IAM CAPAB
 ```
 
 #### Deploy를 할때의 선택지는 아래를 참고하세요. 마지막 선택지까지 고르면 잠시 멈춘듯한 현상이 있는데 지극히 정상이니 걱정하지 마세요.
-<img src="sam.jpg">
+<img src="image/sam.jpg">
 
 #### 완료되면 다음과 같이 보입니다. 이제 마음껏 서비스를 이용할 수 있습니다. 초기 데이터 적재와 초기 유저는 모두 생성되어 있습니다.
-<img src="done.jpg">
+<img src="image/done.jpg">
 
 #### [ECS](https://ap-northeast-2.console.aws.amazon.com/ecs/home?region=ap-northeast-2#/clusters) 콘솔로 들어가면, CFNCluster가 만들어져 있을 것입니다. Service가 있는 것을 확인하고, CFNCluster를 클릭해서 메뉴로 들어갑니다. 들어가서 Services 탭 > Service Name 탭 아래의 cfn-service 클릭 > Task 탭 선택 후, 아래의 Task 탭 아래의 Task 명 선택 > Public IP 찾아서 복사 하는 과정을 거칩니다.  그 다음, 아래의 주소로 들어갑니다. 화면이 성공적으로 호출됩니다.
 
 ```
 http://publicIp/index
 ```
-<img src="main.jpg">
+<img src="image/main.jpg">
 
 #### 현재 서비스에서는 일반 회원인 apple과 프리미엄 회원인 penguin이 이미 가입되어 있습니다. 아래의 정보를 입력해서 로그인해보세요. 이상한 값을 넣으면 에러로 떨어집니다. 
 
@@ -87,7 +87,7 @@ http://publicIp/index
 |apple@amazon.com|12345dgda67|
 
 #### 프리미엄 회원인 penguin은 아래의 서비스를 누릴 수 있습니다. 자신의 아파트와 비슷한 대조군의 아파트가 보여지며, 가격 추세도 한 눈에 볼 수 있습니다.
-<img src="penguin.jpg">
+<img src="image/penguin.jpg">
 
 #### 일반 회원인 apple은 다소 밋밋한 화면만을 보게 되네요. 서비스를 좀 더 확장하면 차이는 보다 커지겠죠?
-<img src="apple.jpg">
+<img src="image/apple.jpg">
