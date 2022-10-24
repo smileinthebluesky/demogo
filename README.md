@@ -45,7 +45,8 @@ docker images
 
 #### AWS Image Repository인 ECR에 로그인하고, Repository를 만듭니다.
 ```bash
-aws ecr get-login-password --region ap-northeast-2 | docker login --username AWS --password-stdin 계정번호.dkr.ecr.ap-northeast-2.amazonaws.com
+aws ecr get-login-password --region ap-northeast-2 
+docker login --username AWS --password-stdin 계정번호.dkr.ecr.ap-northeast-2.amazonaws.com
 aws ecr create-repository --repository-name opaservice --region ap-northeast-2
 ```
 
