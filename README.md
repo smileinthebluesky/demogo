@@ -2,10 +2,13 @@
 
 ###  [OPA](https://www.openpolicyagent.org/) 는 Open Policy Agent의 약자로 서비스를 할 때에 필수적인 policy를 code화 해서 따로 서버를 운영하며, 이를 통해 서비스와 policy를 분리할 수 있게 해주는 Agent입니다. 다양한 분야에서 이용할 수 있지만, 여기에서는 OPA를 통해서 Multi-Tenancy를 구축하는 것에 대해서 다루어 보려고 합니다. 
 
-#### Lee Real Estate 서비스는 부동산 서비스로, 유주택자에게 어떤 아파트로 갈아타는 것이 좋을지에 대한 가이드를 제시합니다. 단, 프리미엄 고객에게만요. Multi-Tenancy로 분리되어 있는 일반 고객과 프리미엄 고객에게는 tier에 따라 다른 서비스를 제공하게 되는데요, OPA를 통해서 이를 간단하게 만들 수 있습니다. 이제 이를 조금의 시간을 들여서 만들어 볼 것입니다.
+#### Lee Real Estate 서비스는 부동산 서비스로, 유주택자에게 어떤 아파트로 갈아타는 것이 좋을지에 대한 가이드를 제시합니다. 단, 프리미엄 고객에게만요. Multi-Tenancy로 분리되어 있는 일반 고객과 프리미엄 고객에게는 tier에 따라 다른 서비스를 제공하게 되는데요, OPA를 통해서 이를 간단하게 만들 수 있습니다. 이를 바탕으로 아래의 흐름을 가진 서비스를 만들어 볼 것입니다.
+<img src="image/flow.jpg">
 
-####  구성하게 되면 다음과 같은 아키텍쳐가 생성됩니다. 도커 이미지를 ECR에 올리는 것 외에는 모든 것이 SAM과 CF를 통해 자동화되어 있습니다! 
-<img src="image/arch.jpeg">
+####  흐름은 이렇습니다. 자동으로 생성되는 User 의 정보로 Login을 하게 되면, 이 User의 Tier정보를 확인합니다. 확인후, OPA Server에 Tier정보와 서비스에 필요한 Role 정보를 가지고 Request를 하게 되며, 이 결과에 따라서 User별 다른 서비스가 제공됩니다. 이 서비스를 만들기 위해 아래의 아키텍쳐를 빌드할 것입니다. 도커 이미지를 ECR에 올리는 것 외에는 모든 것이 SAM과 CF를 통해 자동화되어 있습니다! 
+<img src="image/arch.jpg">
+
+#### 아키텍쳐를 보면, 1. ECS 위에서 Flask 서버를 통해 운영되고 있는 웹 서비스와 2. API gateway 와 Lambda를 통해 웹 서비스와는 별개로 제공되는 OPA Package가 있습니다. 3. Cognito의 경우 로그인 기능과 유저의 tier 및 정보를 저장하는 User DB 역할을, DynamoDB의 경우 아파트의 정보를 저장하는 역할을 합니다. ECS는 VPC 내부에 있는 Subnet 안에 존재하고 있어, 기업의 리소스를 나타내며, OPA Package 는 이와는 분리되어 따로 동작하는 형태로, 서비스를 제공할 때에 Policy를 분리해서 따로 관리할 수 있습니다.
 
 ####  계속 진행하기 위해서는 다음의 임무를 완수해야 합니다. 임무들을 완성하면 나중에도 도움이 될 겁니다. 
 
@@ -89,5 +92,14 @@ http://publicIp/index
 #### 프리미엄 회원인 penguin은 아래의 서비스를 누릴 수 있습니다. 자신의 아파트와 비슷한 대조군의 아파트가 보여지며, 가격 추세도 한 눈에 볼 수 있습니다.
 <img src="image/penguin.jpg">
 
-#### 일반 회원인 apple은 다소 밋밋한 화면만을 보게 되네요. 서비스를 좀 더 확장하면 차이는 보다 커지겠죠?
+#### 일반 회원인 apple은 다소 밋밋한 화면만을 보게 되네요. 
 <img src="image/apple.jpg">
+
+#### 이제 서비스는 살펴보았으니, 내부를 한번 살펴보겠습니다. Demogo-multitenancy 폴더에 들어가 보면, 폴더들과 yaml 파일들을 볼 수 있습니다.
+<img src="image/structure.jpg">
+
+#### 여기에서 template.yaml 파일은 SAM 에서 사용하는 기본 Cloudformation 설정 파일로, 이 설정 파일을 통해 AWS Resource들을 쉽게 올릴 수 있습니다. 이 안에 auth.yaml과 api.yaml을 포함시켜 놓았습니다.
+<img src="image/template.jpg">
+
+#### auth.yaml에서는 Cognito와 Opa package, DynamoDB를 생성하게 되며, api.yaml에서는 ECS와 관련된 자원을 만듭니다. 이렇게 두개의 tempalte이 다른 역할을 하면서 분리되어 있기 때문에, 나중에 따로 쓰기도 용이하고, 실패시 해당 stack 만을 따로 관리할 수 있어 좋습니다. 이제 demogo/demogo-multitenancy/demogo 폴더로 들어가 보겠습니다. init_cognito.py 와 init_dynamo.py 파일이 먼저 보일겁니다. 이는 서비스가 잘 작동할 수 있도록, 미리 유저를 생성하고 아파트 정보를 넣어주는 용도입니다. auth.yaml 로 만들어지는 리소스에서 이를 이용하고 있습니다. 
+
